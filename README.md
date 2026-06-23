@@ -1,284 +1,174 @@
-# 基于RAG与大模型技术的医疗问答系统
+# 医疗领域 Hybrid RAG 智能问答系统
 
-本项目使用的数据集来源于[Open-KG](http://data.openkg.cn/dataset/disease-information)，参考了[RAGOnMedicalKG](https://github.com/liuhuanyong/RAGOnMedicalKG)、[QASystemOnMedicalKG](https://github.com/liuhuanyong/QASystemOnMedicalKG)
+本项目是一个面向医疗问答场景的 Hybrid RAG Demo，基于公开医疗知识图谱问答项目的思路与数据进行二次改造和扩展。项目保留了原有的医疗知识图谱、实体识别、意图识别和 Streamlit 交互框架，并在此基础上接入 Qwen API 与 Qdrant 向量检索，形成「Neo4j Graph RAG + Qdrant Vector RAG」融合问答流程。
 
-## 介绍
+项目主要用于学习、课程展示和面试讲解，不用于真实医疗诊断。
 
-本项目整体流程：
+## 项目来源与改造说明
 
-<img src="img/all.png" style="zoom:100%;" />
+本项目的数据和基础实现参考了以下公开资源：
 
+- Open-KG 疾病知识图谱数据集：http://data.openkg.cn/dataset/disease-information
+- RAGOnMedicalKG：https://github.com/liuhuanyong/RAGOnMedicalKG
+- QASystemOnMedicalKG：https://github.com/liuhuanyong/QASystemOnMedicalKG
 
-本项目设计了一个基于 RAG 与大模型技术的医疗问答系统，利用 DiseaseKG 数据集与 Neo4j 构建知识图谱，结合 BERT 的命名实体识别和 34b 大模型的意图识别，通过精确的知识检索和问答生成，提升系统在医疗咨询中的性能，解决大模型在医疗领域应用的可靠性问题。
+在原有医疗知识图谱问答思路上，本项目主要做了这些改造：
 
-RAG技术：
+- 将原本依赖本地大模型或 Ollama 的调用方式改为 Qwen OpenAI 兼容 API，降低本地部署硬件门槛。
+- 新增 Qdrant 向量检索模块，支持医学 PDF/TXT 文档导入、chunk 切分、embedding 生成和 top-k 语义检索。
+- 将 Neo4j 结构化图谱结果与 Qdrant 非结构化文档片段共同注入 Prompt，实现 Graph RAG + Vector RAG 融合。
+- 保留 BERT/RoBERTa + BiLSTM 医疗实体识别，并结合规则匹配、Aho-Corasick 和 TF-IDF 实体对齐。
+- 在 Streamlit 页面中加入用户登录、管理员视图、多轮对话窗口、模型选择和检索结果调试展示。
 
-<img src="img/RAG.png" style="zoom:100%;" />
+## 核心功能
 
+- 用户登录与注册：支持普通用户和管理员两类角色。
+- 医疗实体识别：识别疾病、药品、症状、检查项目、科室、治疗方法等实体。
+- 意图识别：通过 Prompt 调用 Qwen API 判断用户问题对应的医疗查询意图。
+- 知识图谱检索：基于 Neo4j 查询疾病属性、药品、症状、检查、科室、治疗方法等结构化知识。
+- 向量文档检索：基于 Qdrant 检索医学 PDF/TXT 文档片段，补充非结构化证据。
+- Hybrid RAG 回答生成：融合图谱证据和向量检索证据后，由 Qwen API 生成最终回答。
+- 管理员调试视图：展示实体识别、意图识别、图谱查询和向量检索结果，便于解释系统流程。
 
+## 技术栈
 
-本项目采用知识图谱实现RAG，如果您想用向量数据库实现RAG技术，请移步[Langchain-Chatchat](https://github.com/chatchat-space/Langchain-Chatchat)：
+- Python
+- Streamlit
+- Neo4j
+- Qdrant
+- PyTorch
+- Transformers
+- BERT/RoBERTa + BiLSTM
+- sentence-transformers
+- Qwen OpenAI 兼容 API
 
-<img src="img/langchain+chatglm.png" style="zoom:50%;" />
+## 项目结构
 
-本项目主要贡献：
-
-(1) 传统的 RAG 技术通常是利用向量数据库实现的。区别于传统的 RAG 实现方 式，本项目采用了知识图谱，为大模型提供了更加精确的外部信息。
-
-(2) 本项目构建了一个医疗领域的知识图谱，并采用大语言模型优化了知识图谱数 据集文件的实体信息，使得构建出的知识图谱更加准确与科学。
-
-(3) 本项目通过规则匹配的方式构建了一个实体识别数据集（NER），得益于（2） 在实体名字上的优化，我们的模型可以轻松的在构建的数据集上表现出极高的性能。
-
-(4) 本项目针对实体识别任务提出并实施了三种数据增强策略：实体替换、实体掩 码和实体拼接， 提升了 RoBERTa 模型的性能。 在测试集上，这些数据增强措施使得 RoBERTa 模型的 F1 分数从原来的 96.77%提升至 97.40%。
-
-(5) 为了避免数据标注所造成的人工成本，本项目直接设计 Prompt，结合上下文学习与思维链技术，采用大语言模型对用户的提问进行意图识别。这种方法在减少人工成本的基础上保证了意图识别过程的准确度。
-
-(6) 本项目使用 Streamlit 框架对上述模型进行部署，实现了高度封装。我们的界面 涵盖了注册与登录、大语言模型的选择、创建多个聊天窗口等多项功能。
-
-## :fire:To do
-
-- [x] 增加界面的功能(2024.5.21)：增加了登陆、注册界面(含用户、管理员2个身份)，大模型选择按钮(可选千问和llama)、多窗口对话功能等。
-- [ ] NL2Cyhper
-- [ ] 更多优化...
-
-## Python环境配置
-
-一个例子:
-
+```text
+.
+├── webui.py                         # 主问答页面与 RAG 流程
+├── login.py                         # 登录/注册入口
+├── build_up_graph.py                # Neo4j 医疗知识图谱构建
+├── ner_model.py                     # 医疗实体识别模型
+├── ner_data.py                      # NER 数据处理
+├── ingest_docs.py                   # 文档导入入口
+├── vector_rag/                      # Qdrant 向量检索模块
+├── data/                            # 医疗知识图谱与训练数据
+├── docs/                            # 技术方案和面试复习文档
+├── img/                             # README 与界面截图
+├── model/                           # 模型文件目录
+├── tmp_data/                        # 临时数据
+└── requirements.txt
 ```
-git clone https://github.com/honeyandme/RAGQnASystem.git
-cd RAGQnASystem
-conda create -n RAGQnASystem python=3.10
-conda activate RAGQnASystem
+
+## 环境准备
+
+建议使用 Python 3.10。
+
+```bash
+conda create -n medical-rag python=3.10
+conda activate medical-rag
 pip install -r requirements.txt
 ```
 
-## 构建知识图谱
+## API Key 配置
 
-首先需要安装Neo4j，[官方网站](https://neo4j.com/deployment-center/#community)。本项目使用的版本是neo4j-community-5.18.1，需要依赖jdk17。
+项目不会在代码中保存真实 API Key。运行前需要在本机环境变量中配置：
 
-安装并运行Neo4j后，我们需要根据```data/medical_new_2.json```数据集创建一个知识图谱。
-
-```
-python build_up_graph.py --website YourWebSite --user YourUserName --password YourPassWord --dbname YourDBName
+```powershell
+setx QWEN_API_KEY "你的 Qwen/DashScope API Key"
 ```
 
-其中，```--website```代表你的Neo4j网址，```--user```代表你的数据库用户名，```--password```代表你的数据库密码，```--dbname```代表你的数据库名字。
+设置后请重新打开终端，使环境变量生效。
 
-示例:
+临时测试也可以在当前 PowerShell 窗口中执行：
 
-```
-python build_up_graph.py --website http://localhost:7474 --user neo4j --password YourPassWord --dbname neo4j
-```
-
-运行```build_up_graph.py```后，会自动在```data```文件夹下创建```ent_aug```文件夹和```rel_aug.txt```文件，分别存放所有实体和关系。
-
-
-
-下表展示了```medical_new_2.json```中的关键信息，更多详细信息请点击[这里](https://github.com/nuolade/disease-kb)查看：
-
-知识图谱实体类型（8类实体）：
-
-| 实体类型   | 中文含义 | 实体数量 | 举例               |
-| ---------- | -------- | -------- | ------------------ |
-| Disease    | 疾病     | 8808     | 急性肺脓肿         |
-| Drug       | 药品     | 3828     | 布林佐胺滴眼液     |
-| Food       | 食物     | 4870     | 芝麻               |
-| Check      | 检查项目 | 3353     | 胸部CT检查         |
-| Department | 科目     | 54       | 内科               |
-| Producer   | 在售药品 | 17,201   | 青阳醋酸地塞米松片 |
-| Symptom    | 疾病症状 | 5,998    | 乏力               |
-| Cure       | 治疗方法 | 544      | 抗生素药物治疗     |
-| Total      | 总计     | 44,656   | 约4.4万实体量级    |
-
-疾病实体属性类型（7类属性）：
-
-| 属性类型      | 中文含义     | 举例                          |
-| ------------- | ------------ | ----------------------------- |
-| name          | 疾病名称     | 成人呼吸窘迫综合征            |
-| desc          | 疾病简介     | 成人呼吸窘迫综合征简称ARDS... |
-| cause         | 疾病病因     | 化脓性感染可使细菌毒素...     |
-| prevent       | 预防措施     | 对高危的患者应严密观察...     |
-| cure_lasttime | 治疗周期     | 2-4月                         |
-| cured_prob    | 治愈概率     | 85%                           |
-| easy_get      | 疾病易感人群 | 无特定的人群                  |
-
-知识图谱关系类型（11类关系）：
-
-| 实体关系类型   | 中文含义     | 关系数量 | 举例                                     |
-| -------------- | ------------ | -------- | ---------------------------------------- |
-| belongs_to     | 属于         | 8,843    | <内科,属于, 呼吸内科>                    |
-| common_drug    | 疾病常用药品 | 14,647   | <成人呼吸窘迫综合征,常用, 人血白蛋白>    |
-| do_eat         | 疾病宜吃食物 | 22,230   | <成人呼吸窘迫综合征,宜吃,莲子>           |
-| drugs_of       | 药品在售药品 | 17,315   | <人血白蛋白,在售,莱士人蛋白人血白蛋白>   |
-| need_check     | 疾病所需检查 | 39,418   | <单侧肺气肿,所需检查,支气管造影>         |
-| no_eat         | 疾病忌吃食物 | 22,239   | <成人呼吸窘迫综合征,忌吃, 啤酒>          |
-| recommand_drug | 疾病推荐药品 | 59,465   | <混合痔,推荐用药,京万红痔疮膏>           |
-| recommand_eat  | 疾病推荐食谱 | 40,221   | <成人呼吸窘迫综合征,推荐食谱,百合糖粥>   |
-| has_symptom    | 疾病症状     | 54,710   | <成人呼吸窘迫综合征,疾病症状,呼吸困难>   |
-| acompany_with  | 疾病并发疾病 | 12,024   | <成人呼吸窘迫综合征,并发疾病,细菌性肺炎> |
-| cure_way       | 疾病治疗方法 | 21，047  | <急性肺脓肿,治疗方法,抗生素药物治疗>     |
-| Total          | 总计         | 312,159  | 约31万关系量级                           |
-
-创建的知识图谱如下图所示（某一检索结果）：
-
-<img src="img/neo4j.png" style="zoom:100%;" />
-
-## 实体识别(NER)
-
-什么是NER？
-
-<img src="img/shitishibie.png" style="zoom:90%;" />
-
-
-
-
-
-**<u>数据集创建：</u>**
-
-你可以运行```ner_data.py```，这段代码会根据```data/medical_new_2.json```中的文字，结合规则匹配技术，创建一个NER数据集，保存在```data/ner_data_aug.txt```中。
-
-```
-python ner_data.py #可以不运行
+```powershell
+$env:QWEN_API_KEY="你的 Qwen/DashScope API Key"
 ```
 
-注1：我们已经上传了```ner_data_aug.txt```文件，您可以选择不运行```ner_data.py```。
+## Neo4j 知识图谱构建
 
-注2：我们采用BIO的策略对数据集进行标注，标注的结果如下图所示：
+先安装并启动 Neo4j，然后执行：
 
-<img src="img/nerdata.png" style="zoom:40%;" />
-
-
-
-**<u>模型训练：</u>**
-
-```ner_model.py``` 代码定义了NER模型的网络架构和训练方式。若您需要重新训练一个模型，请您在Huggingface上下载一个[chinese-roberta-wwm-ext](https://huggingface.co/hfl/chinese-roberta-wwm-ext)，并保存在```model```文件夹下，然后运行```ner_model.py``` 。
-
-```
-python ner_model.py #可以不运行
+```bash
+python build_up_graph.py --website http://localhost:7474 --user neo4j --password YourPassword --dbname neo4j
 ```
 
-注1：若您不想训练，可以[下载](https://pan.baidu.com/s/1kwiNDyNjO2E2uO0oYmK8SA?pwd=08or)我们训练好的模型，并保存在```model```文件夹下，无需运行训练代码。
+运行后会根据 `data/medical_new_2.json` 构建医疗知识图谱，并生成实体、关系相关的辅助文件。
 
-注2：我们的NER模型采用了简单的BERT架构。
+## 向量文档导入
 
-```python
-class Bert_Model(nn.Module):
-    def __init__(self, model_name, hidden_size, tag_num, bi):
-        super().__init__()
-        self.bert = BertModel.from_pretrained(model_name)
-        self.lstm = nn.LSTM(input_size=768, hidden_size=hidden_size, num_layers=2, batch_first=True, bidirectional=bi)
-        if bi:
-            self.classifier = nn.Linear(hidden_size*2, tag_num)
-        else:
-            self.classifier = nn.Linear(hidden_size, tag_num)
-        self.loss_fn = nn.CrossEntropyLoss(ignore_index=0)
+如果需要使用 Qdrant Vector RAG，可以通过文档导入脚本把医学 PDF/TXT 加入向量库：
 
-    def forward(self, x, label=None):
-        bert_0, _ = self.bert(x, attention_mask=(x > 0), return_dict=False)
-        gru_0, _ = self.lstm(bert_0)
-        pre = self.classifier(gru_0)
-        if label is not None:
-            loss = self.loss_fn(pre.reshape(-1, pre.shape[-1]), label.reshape(-1))
-            return loss
-        else:
-            return torch.argmax(pre, dim=-1).squeeze(0)
+```bash
+python ingest_docs.py
 ```
 
-注3:我们在训练过程运用了实体替换、实体掩码、实体拼接三种数据增强策略，改进了模型的性能。下面是在测试集上的F1 Score：
+向量检索相关代码位于 `vector_rag/`，主要包括文档加载、文本切分、embedding 生成、Qdrant 写入和检索结果格式化。
 
-| 模型名称                | 未数据增强 | 数据增强 |
-| ----------------------- | ---------- | -------- |
-| bert-base-chinese       | 97.13%     | 97.42%   |
-| chinese-roberta-wwm-ext | 96.77%     | 97.40%   |
+## 启动系统
 
-注4：为了使模型的识别结果与知识图谱上的实体名相匹配，我们使用了TF-IDF实体对齐。
-
-## 意图识别
-
-什么是意图识别？
-
-<img src="img/yitushibie.jpg" style="zoom:50%;" />
-
-
-
-我们对比了3种意图识别的策略(规则匹配、训练模型、提示工程)：
-
-| 策略     | 准确性 | 多意图识别 | 人工成本     | 推理速度 | 资源消耗 |
-| -------- | ------ | ---------- | ------------ | -------- | -------- |
-| 规则匹配 | 低     | x          | 低           | 快       | 低       |
-| 训练模型 | 高     | x          | 高(数据标注) | 中等     | 中等     |
-| 提示工程 | 高     | ✓          | 低           | 慢       | 高       |
-
-综合考虑，我们采用了提示工程的手段：我们将意图分为16种，根据16类意图设计Prompt，让大模型对用户的查询进行意图分析。
-
-注1：我们结合了上下文学习和思维链技术，最终取得了良好的结果。
-
-注2：这部分代码整合到了```webui.py```中，您无需进行任何操作。
-
-## 知识图谱查询
-
-我们为每一个意图，设置了一个查询语句。
-
-<img src="img/yuju.jpg" style="zoom:30%;" />
-
-注：这部分代码整合到了```webui.py```中，您无需进行任何操作。
-
-## 运行界面
-
-
-
-我们将意图识别、知识库查询、对话界面都写在了```webui.py```中。2024.5.21，我们为界面增加了登陆、注册界面，设置了用户和管理员两种身份，您可以使用命令启动：
-
-```
+```bash
 streamlit run login.py
 ```
 
-登陆界面如下图所示：
+启动后可在浏览器中进入登录页面。管理员视图可以查看系统中间结果，普通用户视图用于模拟医疗问答流程。
 
-<img src="img/login.png" style="zoom:100%;" />
+## 运行流程
 
-注册界面如下图所示：
+```text
+用户问题
+  -> 医疗实体识别
+  -> Qwen API 意图识别
+  -> Neo4j 图谱检索
+  -> Qdrant 向量检索
+  -> 图谱证据 + 文档证据融合
+  -> Qwen API 生成最终回答
+  -> Streamlit 页面展示
+```
 
-<img src="img/register.png" style="zoom:100%;" />
+## 截图
 
-管理员登陆界面如下图所示：
+### 系统流程
 
-<img src="img/admin.png" style="zoom:70%;" />
+![系统流程](img/all.png)
 
-用户登陆界面如下图所示：
+### RAG 流程
 
-<img src="img/user.png" style="zoom:70%;" />
+![RAG](img/RAG.png)
 
-几个运行例子：
+### 登录页面
 
-<img src="img/e1.png" style="zoom:40%;" />
+![登录页面](img/login.png)
 
-<img src="img/e2.png" style="zoom:40%;" />
+### 管理员页面
 
-<img src="img/e3.png" style="zoom:40%;" />
+![管理员页面](img/admin.png)
 
-<img src="img/e4.png" style="zoom:40%;" />
+### 用户页面
 
-<img src="img/e5.png" style="zoom:40%;" />
+![用户页面](img/user.png)
 
-<img src="img/e6.png" style="zoom:40%;" />
+### Neo4j 图谱示例
 
-<img src="img/e7.png" style="zoom:40%;" />
+![Neo4j](img/neo4j.png)
 
-## 未来工作
+## 注意事项
 
-### NL2Cyhper
+- 本项目是学习与展示项目，不构成医疗建议。
+- 真实 API Key 不应写入代码，也不应提交到 GitHub。
+- `model/chinese-roberta-wwm-ext/` 和 `model/best_roberta_rnn_model_ent_aug.pt` 体积较大，当前通过 `.gitignore` 排除，需要运行时自行准备。
+- `tmp_data/user_credentials.json` 是本地测试账号文件，包含明文测试账号密码，不建议上传到公开仓库。
+- 如果需要复现完整 NER 流程，请下载或训练对应 RoBERTa/BERT 模型权重。
 
-我们将意图归为16类，已经涵盖了大部分意图，但是无法穷尽所有的意图，无法充分利用知识图谱中的数据。因此，我们尝试进行NL2Cyhper：抛弃实体识别和意图识别两个操作，直接根据用户的问题生成查询语句。
+## 简历描述参考
 
-<img src="img/nl2cyhper.jpg" style="zoom:30%;" />
+**医疗领域 Hybrid RAG 智能问答系统 | Python, Streamlit, Neo4j, Qdrant, BERT, Qwen API**
 
-问题：需要人工进行数据标注。
-
-## 联系方式
-
-如果您的复现遇到了困难，请随时联系！
-
-邮箱：zeromakers@outlook.com
-
+- 基于 Streamlit 构建医疗问答系统，支持用户登录注册、管理员调试视图、多轮对话窗口和检索结果展示。
+- 使用 BERT/RoBERTa + BiLSTM 实现医疗实体识别，结合 Aho-Corasick 规则匹配和 TF-IDF 实体对齐。
+- 基于 Neo4j 构建医疗知识图谱，实现疾病、药品、症状、检查项目、科室和治疗方法等结构化查询。
+- 设计 Prompt-based 意图识别流程，调用 Qwen OpenAI 兼容 API 识别用户问题中的多类别查询意图。
+- 新增 Qdrant 向量检索模块，支持医学 PDF/TXT 文档导入、chunk 切分、embedding 生成和 top-k 语义检索。
+- 实现 Neo4j Graph RAG 与 Qdrant Vector RAG 融合，将结构化图谱结果和非结构化文档片段共同注入 Prompt，提升回答依据覆盖率。
